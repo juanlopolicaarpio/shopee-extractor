@@ -95,23 +95,73 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Helper function to parse sold count string to number
+function parseSoldCount(soldCountStr: string): number {
+  if (!soldCountStr || soldCountStr === '0' || soldCountStr === '') {
+    return 0;
+  }
+
+  // Remove any text like "sold", "Sold", etc.
+  let cleaned = soldCountStr.toString().toLowerCase().replace(/sold/gi, '').trim();
+  
+  // Handle "K" suffix (e.g., "1.3K" or "20K")
+  if (cleaned.includes('k')) {
+    const numStr = cleaned.replace('k', '').trim();
+    const num = parseFloat(numStr);
+    return isNaN(num) ? 0 : num * 1000;
+  }
+  
+  // Handle regular numbers with commas
+  cleaned = cleaned.replace(/,/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 function generateExcel(products: any[]): Buffer {
-  const rows = products.map(p => ({
-    'Product Name': p.name,
-    'Price (₱)': p.price,
-    'Original Price (₱)': p.originalPrice || '',
-    'Discount': p.discount || '',
-    'Rating': p.rating || '',
-    'Reviews': p.reviewCount || 0,
-    'Sold Count': p.soldCount || '0',
-    'Item ID': p.itemId,
-    'Shop Name': p.shopName || '',
-    'Location': p.location || '',
-    'Brand': p.brand || '',
-    'In Stock': p.inStock ? 'Yes' : 'No',
-    'Image URL': p.imageUrl,
-    'Product URL': p.productUrl
-  }));
+  const rows = products.map(p => {
+    const soldCountNumeric = parseSoldCount(p.soldCount);
+    const totalSales = p.price * soldCountNumeric;
+
+    return {
+      'Product Name': p.name,
+      'Price (₱)': p.price,
+      'Original Price (₱)': p.originalPrice || '',
+      'Discount': p.discount || '',
+      'Rating': p.rating || '',
+      'Reviews': p.reviewCount || 0,
+      'Sold Count': p.soldCount || '0',
+      'Total Sales (₱)': totalSales,
+      'Item ID': p.itemId,
+      'Shop Name': p.shopName || '',
+      'Location': p.location || '',
+      'Brand': p.brand || '',
+      'In Stock': p.inStock ? 'Yes' : 'No',
+      'Image URL': p.imageUrl,
+      'Product URL': p.productUrl
+    };
+  });
+
+  // Calculate grand total
+  const grandTotal = rows.reduce((sum, row) => sum + (row['Total Sales (₱)'] || 0), 0);
+
+  // Add TOTAL row
+  rows.push({
+    'Product Name': 'TOTAL',
+    'Price (₱)': '',
+    'Original Price (₱)': '',
+    'Discount': '',
+    'Rating': '',
+    'Reviews': '',
+    'Sold Count': '',
+    'Total Sales (₱)': grandTotal,
+    'Item ID': '',
+    'Shop Name': '',
+    'Location': '',
+    'Brand': '',
+    'In Stock': '',
+    'Image URL': '',
+    'Product URL': ''
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   
@@ -124,6 +174,7 @@ function generateExcel(products: any[]): Buffer {
     { wch: 8 },  // Rating
     { wch: 10 }, // Reviews
     { wch: 15 }, // Sold Count
+    { wch: 18 }, // Total Sales
     { wch: 15 }, // Item ID
     { wch: 20 }, // Shop Name
     { wch: 15 }, // Location
@@ -140,22 +191,50 @@ function generateExcel(products: any[]): Buffer {
 }
 
 function generateCSV(products: any[]): string {
-  const data = products.map(p => ({
-    'Product Name': p.name,
-    'Price (₱)': p.price,
-    'Original Price (₱)': p.originalPrice || '',
-    'Discount': p.discount || '',
-    'Rating': p.rating || '',
-    'Reviews': p.reviewCount || 0,
-    'Sold Count': p.soldCount || '0',
-    'Item ID': p.itemId,
-    'Shop Name': p.shopName || '',
-    'Location': p.location || '',
-    'Brand': p.brand || '',
-    'In Stock': p.inStock ? 'Yes' : 'No',
-    'Image URL': p.imageUrl,
-    'Product URL': p.productUrl
-  }));
+  const data = products.map(p => {
+    const soldCountNumeric = parseSoldCount(p.soldCount);
+    const totalSales = p.price * soldCountNumeric;
+
+    return {
+      'Product Name': p.name,
+      'Price (₱)': p.price,
+      'Original Price (₱)': p.originalPrice || '',
+      'Discount': p.discount || '',
+      'Rating': p.rating || '',
+      'Reviews': p.reviewCount || 0,
+      'Sold Count': p.soldCount || '0',
+      'Total Sales (₱)': totalSales,
+      'Item ID': p.itemId,
+      'Shop Name': p.shopName || '',
+      'Location': p.location || '',
+      'Brand': p.brand || '',
+      'In Stock': p.inStock ? 'Yes' : 'No',
+      'Image URL': p.imageUrl,
+      'Product URL': p.productUrl
+    };
+  });
+
+  // Calculate grand total
+  const grandTotal = data.reduce((sum, row) => sum + (row['Total Sales (₱)'] || 0), 0);
+
+  // Add TOTAL row
+  data.push({
+    'Product Name': 'TOTAL',
+    'Price (₱)': '',
+    'Original Price (₱)': '',
+    'Discount': '',
+    'Rating': '',
+    'Reviews': '',
+    'Sold Count': '',
+    'Total Sales (₱)': grandTotal,
+    'Item ID': '',
+    'Shop Name': '',
+    'Location': '',
+    'Brand': '',
+    'In Stock': '',
+    'Image URL': '',
+    'Product URL': ''
+  });
 
   return Papa.unparse(data);
 }
