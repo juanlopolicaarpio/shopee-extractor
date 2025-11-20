@@ -8,17 +8,17 @@ export const maxDuration = 300; // 5 minutes for Vercel
 export async function POST(request: NextRequest) {
   const scraper = new LazadaScraper({
     headless: true,
-    timeout: 30000,
-    maxProducts: 50
+    timeout: 60000,
+    maxProducts: 500
   });
 
   try {
     const body = await request.json();
-    const { urls, type, format } = body;
+    const { urls, format } = body;
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
-        { error: 'Please provide an array of Lazada URLs' },
+        { error: 'Please provide an array of Lazada shop URLs' },
         { status: 400 }
       );
     }
@@ -27,18 +27,13 @@ export async function POST(request: NextRequest) {
 
     let allProducts: any[] = [];
 
-    // Scrape based on type
+    // Scrape each shop page
     for (const url of urls) {
       try {
-        if (type === 'product') {
-          // Single product scraping
-          const product = await scraper.scrapeProductPage(url);
-          allProducts.push(product);
-        } else if (type === 'search' || type === 'category') {
-          // Search or category scraping (multiple products)
-          const products = await scraper.scrapeCategoryPage(url);
-          allProducts = [...allProducts, ...products];
-        }
+        console.log(`Scraping ${url}...`);
+        const products = await scraper.scrapeShopPage(url);
+        console.log(`Found ${products.length} products from ${url}`);
+        allProducts = [...allProducts, ...products];
       } catch (error) {
         console.error(`Failed to scrape ${url}:`, error);
       }
@@ -52,6 +47,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log(`Total products scraped: ${allProducts.length}`);
 
     // Generate file based on format
     let fileContent: Buffer | string;
@@ -106,7 +103,7 @@ function generateExcel(products: any[]): Buffer {
     'Discount': p.discount || '',
     'Rating': p.rating || '',
     'Reviews': p.reviewCount || 0,
-    'Sold Count': p.soldCount,
+    'Sold Count': p.soldCount || '0',
     'Item ID': p.itemId,
     'Shop Name': p.shopName || '',
     'Location': p.location || '',
@@ -150,7 +147,7 @@ function generateCSV(products: any[]): string {
     'Discount': p.discount || '',
     'Rating': p.rating || '',
     'Reviews': p.reviewCount || 0,
-    'Sold Count': p.soldCount,
+    'Sold Count': p.soldCount || '0',
     'Item ID': p.itemId,
     'Shop Name': p.shopName || '',
     'Location': p.location || '',

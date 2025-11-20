@@ -2,11 +2,8 @@
 
 import { useState } from 'react';
 
-type ScraperType = 'product' | 'search' | 'category';
-
 export default function LazadaScraperPage() {
   const [urls, setUrls] = useState<string[]>(['']);
-  const [scraperType, setScraperType] = useState<ScraperType>('category');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [error, setError] = useState<string>('');
@@ -32,16 +29,14 @@ export default function LazadaScraperPage() {
     setStats(null);
 
     try {
-      // Filter out empty URLs
       const validUrls = urls.filter(url => url.trim() !== '');
 
       if (validUrls.length === 0) {
-        setError('Please provide at least one Lazada URL');
+        setError('Please provide at least one Lazada shop/brand URL');
         setLoading(false);
         return;
       }
 
-      // Validate URLs
       const invalidUrls = validUrls.filter(url => !url.includes('lazada.com'));
       if (invalidUrls.length > 0) {
         setError('All URLs must be from Lazada.com');
@@ -56,7 +51,6 @@ export default function LazadaScraperPage() {
         },
         body: JSON.stringify({
           urls: validUrls,
-          type: scraperType,
           format: format
         })
       });
@@ -66,7 +60,6 @@ export default function LazadaScraperPage() {
         throw new Error(errorData.error || 'Failed to scrape products');
       }
 
-      // Get stats from headers
       const totalProducts = response.headers.get('X-Total-Products');
 
       setStats({
@@ -74,7 +67,6 @@ export default function LazadaScraperPage() {
         totalUrls: validUrls.length
       });
 
-      // Download file
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -99,57 +91,26 @@ export default function LazadaScraperPage() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              🏪 Lazada Automated Scraper
+              🏪 Lazada Shop Scraper
             </h1>
             <p className="text-gray-600">
-              Enter Lazada URLs and automatically scrape product data
+              Extract all products from Lazada shop/brand pages automatically
             </p>
           </div>
 
-          {/* Scraper Type Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Scraping Mode
-            </label>
-            <div className="grid grid-cols-3 gap-4">
-              <button
-                onClick={() => setScraperType('product')}
-                className={`p-4 rounded-lg border-2 transition-colors ${
-                  scraperType === 'product'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-2xl mb-2">📦</div>
-                <div className="font-semibold">Single Product</div>
-                <div className="text-xs text-gray-500">Product detail page</div>
-              </button>
-
-              <button
-                onClick={() => setScraperType('search')}
-                className={`p-4 rounded-lg border-2 transition-colors ${
-                  scraperType === 'search'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-2xl mb-2">🔍</div>
-                <div className="font-semibold">Search Results</div>
-                <div className="text-xs text-gray-500">Multiple products</div>
-              </button>
-
-              <button
-                onClick={() => setScraperType('category')}
-                className={`p-4 rounded-lg border-2 transition-colors ${
-                  scraperType === 'category'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-2xl mb-2">📁</div>
-                <div className="font-semibold">Category Page</div>
-                <div className="text-xs text-gray-500">Multiple products</div>
-              </button>
+          {/* Info Banner */}
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-blue-700">
+                  <strong>Supported URLs:</strong> Lazada shop pages and brand store pages (e.g., cetaphil, lazmall stores)
+                </p>
+              </div>
             </div>
           </div>
 
@@ -159,12 +120,12 @@ export default function LazadaScraperPage() {
               <div key={index} className="relative">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">
-                    Lazada URL {index + 1} {urls.length > 1 && `(${index + 1}/${urls.length})`}
+                    Lazada Shop URL {index + 1} {urls.length > 1 && `(${index + 1}/${urls.length})`}
                   </label>
                   {urls.length > 1 && (
                     <button
                       onClick={() => removeUrlInput(index)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="text-red-500 hover:text-red-700 text-sm font-medium"
                     >
                       ✕ Remove
                     </button>
@@ -174,12 +135,8 @@ export default function LazadaScraperPage() {
                   type="text"
                   value={url}
                   onChange={(e) => updateUrlInput(index, e.target.value)}
-                  placeholder={
-                    scraperType === 'product'
-                      ? 'https://www.lazada.com.ph/products/...'
-                      : 'https://www.lazada.com.ph/tag/... or /catalog/?q=...'
-                  }
-                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://www.lazada.com.ph/cetaphil/?q=All-Products&from=wangpu..."
+                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
               </div>
             ))}
@@ -188,7 +145,7 @@ export default function LazadaScraperPage() {
           {/* Add More Button */}
           <button
             onClick={addUrlInput}
-            className="mb-6 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
+            className="mb-6 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors font-medium"
           >
             ➕ Add Another URL
           </button>
@@ -225,7 +182,7 @@ export default function LazadaScraperPage() {
                 <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                 <div>
                   <div className="font-semibold text-blue-800">Scraping in progress...</div>
-                  <div className="text-sm text-blue-600">This may take a few minutes depending on the number of products</div>
+                  <div className="text-sm text-blue-600">Loading all products from the shop. This may take 2-5 minutes.</div>
                 </div>
               </div>
             </div>
@@ -257,41 +214,46 @@ export default function LazadaScraperPage() {
           )}
 
           {/* Instructions */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-2">📖 How to Use</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+            <h3 className="font-semibold text-gray-800 mb-4 text-lg">📖 How to Use</h3>
             
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Step 1: Choose Scraping Mode</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                  <li><strong>Single Product:</strong> Extract one product at a time</li>
-                  <li><strong>Search Results:</strong> Extract all products from search pages</li>
-                  <li><strong>Category Page:</strong> Extract all products from category pages</li>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Step 1: Copy Shop/Brand URL</p>
+                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
+                  <li>Go to a Lazada shop or brand page</li>
+                  <li>Example: <code className="bg-gray-200 px-1 py-0.5 rounded text-xs">lazada.com.ph/cetaphil/?q=All-Products</code></li>
+                  <li>Copy the full URL from your browser</li>
                 </ul>
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Step 2: Add Lazada URLs</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                  <li>Copy URLs directly from Lazada.com.ph</li>
-                  <li>Example: https://www.lazada.com.ph/tag/lazmall-official-store-cetaphil/</li>
-                  <li>Add multiple URLs to scrape more products</li>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Step 2: Paste URL Above</p>
+                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
+                  <li>Paste the URL in the input field</li>
+                  <li>Add multiple URLs to scrape multiple shops at once</li>
+                  <li>The scraper will automatically load ALL products from each shop</li>
                 </ul>
               </div>
 
               <div>
                 <p className="text-sm font-semibold text-gray-700 mb-2">Step 3: Download</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
                   <li>Click your preferred format (Excel, CSV, or JSON)</li>
-                  <li>Wait for scraping to complete (may take 1-5 minutes)</li>
-                  <li>File will download automatically</li>
+                  <li>Wait for scraping to complete (usually 2-5 minutes)</li>
+                  <li>File will download automatically with all product data</li>
                 </ul>
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mt-4">
                 <p className="text-sm text-yellow-800">
-                  <strong>⚠️ Note:</strong> Scraping may be slower than JSON extraction. Be patient and don't refresh the page while scraping.
+                  <strong>⚠️ Important Notes:</strong>
                 </p>
+                <ul className="list-disc list-inside text-sm text-yellow-700 mt-2 space-y-1 ml-2">
+                  <li>Scraping takes time - be patient and don't refresh the page</li>
+                  <li>The scraper loads ALL products, not just the first page</li>
+                  <li>Includes: name, price, discount, rating, sold count, shop info, etc.</li>
+                </ul>
               </div>
             </div>
           </div>

@@ -30,8 +30,8 @@ export class LazadaScraper {
   constructor(options: LazadaScraperOptions = {}) {
     this.options = {
       headless: true,
-      timeout: 30000,
-      maxProducts: 100,
+      timeout: 60000,
+      maxProducts: 500,
       ...options
     };
   }
@@ -58,115 +58,11 @@ export class LazadaScraper {
     }
   }
 
-  async scrapeProductPage(url: string): Promise<ScrapedProduct> {
-    if (!this.browser) {
-      await this.initialize();
-    }
-
-    const page = await this.browser!.newPage();
-    
-    try {
-      // Set viewport and user agent
-      await page.setViewport({ width: 1920, height: 1080 });
-      
-      // Navigate to the page
-      await page.goto(url, {
-        waitUntil: 'networkidle2',
-        timeout: this.options.timeout
-      });
-
-      // Wait for main content to load
-      await page.waitForSelector('.pdp-mod-product-badge-wrapper', { timeout: 10000 }).catch(() => {});
-      
-      // Extract product data
-      const productData = await page.evaluate(() => {
-        // Helper function to get text content
-        const getText = (selector: string): string => {
-          const el = document.querySelector(selector);
-          return el?.textContent?.trim() || '';
-        };
-
-        // Helper function to get attribute
-        const getAttr = (selector: string, attr: string): string => {
-          const el = document.querySelector(selector);
-          return el?.getAttribute(attr) || '';
-        };
-
-        // Extract data
-        const name = getText('.pdp-mod-product-badge-title') || getText('h1');
-        
-        // Price
-        const priceText = getText('.pdp-price_type_normal') || getText('.pdp-price');
-        const price = parseFloat(priceText.replace(/[₱,\s]/g, '')) || 0;
-        
-        // Original price
-        const originalPriceText = getText('.pdp-price_type_deleted');
-        const originalPrice = originalPriceText ? parseFloat(originalPriceText.replace(/[₱,\s]/g, '')) : null;
-        
-        // Discount
-        const discount = getText('.pdp-product-price__discount');
-        
-        // Rating
-        const ratingText = getText('.score-average');
-        const rating = ratingText ? parseFloat(ratingText) : null;
-        
-        // Review count
-        const reviewText = getText('.pdp-review-summary__link');
-        const reviewMatch = reviewText.match(/\d+/);
-        const reviewCount = reviewMatch ? parseInt(reviewMatch[0]) : 0;
-        
-        // Sold count
-        const soldCount = getText('.pdp-product-sold') || '0';
-        
-        // Shop name
-        const shopName = getText('.pdp-seller-name') || getText('.seller-name__title');
-        
-        // Location
-        const location = getText('.location__text') || getText('.seller-location');
-        
-        // Image
-        const imageUrl = getAttr('.gallery-preview-panel__image', 'src') || 
-                        getAttr('.pdp-mod-common-image img', 'src');
-        
-        // Brand
-        const brand = getText('.pdp-product-brand__brand-link');
-        
-        // Stock status
-        const inStockText = getText('.pdp-product-stock');
-        const inStock = !inStockText.toLowerCase().includes('out of stock');
-        
-        // Item ID from URL
-        const urlMatch = window.location.href.match(/i(\d+)-/);
-        const itemId = urlMatch ? urlMatch[1] : '';
-
-        return {
-          name,
-          price,
-          originalPrice,
-          discount,
-          rating,
-          reviewCount,
-          soldCount,
-          shopName,
-          location,
-          imageUrl,
-          brand,
-          inStock,
-          itemId,
-          productUrl: window.location.href
-        };
-      });
-
-      await page.close();
-      return productData as ScrapedProduct;
-
-    } catch (error) {
-      await page.close();
-      throw new Error(`Failed to scrape product: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async scrapeSearchResults(searchUrl: string): Promise<ScrapedProduct[]> {
+  async scrapeShopPage(url: string): Promise<ScrapedProduct[]> {
     if (!this.browser) {
       await this.initialize();
     }
@@ -177,109 +73,246 @@ export class LazadaScraper {
     try {
       await page.setViewport({ width: 1920, height: 1080 });
       
-      // Navigate to search page
-      await page.goto(searchUrl, {
-        waitUntil: 'networkidle2',
+      console.log('Navigating to:', url);
+      await page.goto(url, {
+        waitUntil: 'networkidle0',
         timeout: this.options.timeout
       });
 
-      // Wait for products to load
-      await page.waitForSelector('[data-qa-locator="product-item"]', { timeout: 10000 });
+      // Wait a bit for page to fully load
+      await this.delay(3000);
 
-      // Scroll to load more products
-      await this.autoScroll(page);
+      // Try multiple product container selectors
+      const productSelectors = [
+        '.Bm3ON',
+        '[data-qa-locator="product-item"]',
+        '.gridItem',
+        '.product-item',
+        '.item-card'
+      ];
 
-      // Extract product URLs
-      const productUrls = await page.evaluate(() => {
-        const items = Array.from(document.querySelectorAll('[data-qa-locator="product-item"]'));
-        return items.map(item => {
-          const link = item.querySelector('a');
-          return link?.href || '';
-        }).filter(url => url.length > 0);
-      });
-
-      await page.close();
-
-      // Scrape each product (limit to maxProducts)
-      const urlsToScrape = productUrls.slice(0, this.options.maxProducts);
-      
-      for (const url of urlsToScrape) {
-        try {
-          const product = await this.scrapeProductPage(url);
-          products.push(product);
-          
-          // Add delay between requests to avoid blocking
-          await this.delay(1000 + Math.random() * 2000);
-        } catch (error) {
-          console.error(`Failed to scrape ${url}:`, error);
+      let workingSelector = '';
+      for (const selector of productSelectors) {
+        const count = await page.evaluate((sel) => {
+          return document.querySelectorAll(sel).length;
+        }, selector);
+        
+        console.log(`Selector "${selector}": ${count} products found`);
+        
+        if (count > 0) {
+          workingSelector = selector;
+          console.log(`✓ Using selector: ${selector}`);
+          break;
         }
       }
 
-      return products;
+      if (!workingSelector) {
+        throw new Error('Could not find product elements on page');
+      }
 
-    } catch (error) {
-      await page.close();
-      throw new Error(`Failed to scrape search results: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
+      let previousCount = 0;
+      let stableCount = 0;
+      let scrollAttempts = 0;
+      const maxScrollAttempts = 100; // Increased for more products
 
-  async scrapeCategoryPage(categoryUrl: string): Promise<ScrapedProduct[]> {
-    if (!this.browser) {
-      await this.initialize();
-    }
+      // Aggressive scrolling to load all products
+      while (scrollAttempts < maxScrollAttempts) {
+        // Check for "Load More" button and click it
+        const loadMoreClicked = await page.evaluate(() => {
+          const loadMoreButtons = [
+            'button[class*="load"]',
+            'button[class*="more"]',
+            '.ant-pagination-next',
+            '[class*="loadMore"]'
+          ];
+          
+          for (const selector of loadMoreButtons) {
+            const btn = document.querySelector(selector) as HTMLElement;
+            if (btn && btn.offsetParent !== null) {
+              btn.click();
+              return true;
+            }
+          }
+          return false;
+        });
 
-    const page = await this.browser!.newPage();
-    const products: ScrapedProduct[] = [];
-    
-    try {
-      await page.setViewport({ width: 1920, height: 1080 });
-      
-      await page.goto(categoryUrl, {
-        waitUntil: 'networkidle2',
-        timeout: this.options.timeout
-      });
+        if (loadMoreClicked) {
+          console.log('Clicked "Load More" button');
+          await this.delay(2000);
+        }
 
-      // Wait for products
-      await page.waitForSelector('.Bm3ON', { timeout: 10000 }).catch(() => {});
+        // Scroll down
+        await page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
 
-      // Scroll to load more
-      await this.autoScroll(page);
+        // Wait for new content to load
+        await this.delay(2000);
 
-      // Extract products from the page
-      const pageProducts = await page.evaluate(() => {
-        const items = Array.from(document.querySelectorAll('.Bm3ON'));
+        // Count current products
+        const currentCount = await page.evaluate((sel) => {
+          return document.querySelectorAll(sel).length;
+        }, workingSelector);
+
+        console.log(`Scroll ${scrollAttempts + 1}: Found ${currentCount} products`);
+
+        // Check if we're still loading new products
+        if (currentCount === previousCount) {
+          stableCount++;
+          // If count hasn't changed for 5 attempts, we're done
+          if (stableCount >= 5) {
+            console.log('No new products loaded for 5 attempts, finishing...');
+            break;
+          }
+        } else {
+          stableCount = 0;
+        }
+
+        previousCount = currentCount;
+        scrollAttempts++;
+
+        // Also scroll back up a bit to trigger lazy loading
+        if (scrollAttempts % 2 === 0) {
+          await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight * 0.5);
+          });
+          await this.delay(1000);
+        }
+      }
+
+      // Final scroll to top to ensure all images loaded
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await this.delay(2000);
+
+      // Extract all products
+      console.log('Extracting product data...');
+      const pageProducts = await page.evaluate((selector) => {
+        const items = Array.from(document.querySelectorAll(selector));
+        console.log(`Extracting ${items.length} products...`);
         
-        return items.map(item => {
-          const getText = (selector: string): string => {
-            const el = item.querySelector(selector);
-            return el?.textContent?.trim() || '';
+        return items.map((item, index) => {
+          const getText = (selectors: string[]): string => {
+            for (const sel of selectors) {
+              const el = item.querySelector(sel);
+              if (el?.textContent?.trim()) {
+                return el.textContent.trim();
+              }
+            }
+            return '';
           };
 
-          const getAttr = (selector: string, attr: string): string => {
-            const el = item.querySelector(selector);
-            return el?.getAttribute(attr) || '';
+          const getAttr = (selectors: string[], attr: string): string => {
+            for (const sel of selectors) {
+              const el = item.querySelector(sel);
+              const value = el?.getAttribute(attr);
+              if (value) return value;
+            }
+            return '';
           };
 
-          const name = getText('.RfADt');
-          const priceText = getText('.ooOxS');
+          // Product name - try multiple selectors
+          const name = getText([
+            '.RfADt',
+            '[class*="title"]',
+            '[class*="name"]',
+            'a[title]'
+          ]) || `Unknown Product ${index + 1}`;
+          
+          // Price - try multiple selectors
+          const priceText = getText([
+            '.ooOxS',
+            '._43F-s',
+            '[class*="price"]',
+            '.price'
+          ]);
           const price = parseFloat(priceText.replace(/[₱,\s]/g, '')) || 0;
           
-          const originalPriceText = getText('.IaHHh');
+          // Original price
+          const originalPriceText = getText([
+            '.IaHHh',
+            '[class*="origin"]',
+            '[class*="original"]'
+          ]);
           const originalPrice = originalPriceText ? parseFloat(originalPriceText.replace(/[₱,\s]/g, '')) : null;
           
-          const discount = getText('.WNoq3');
-          const location = getText('.oa6ri');
-          const soldCount = getText('.m2RZo') || '0';
+          // Discount
+          const discount = getText([
+            '.WNoq3',
+            '[class*="discount"]',
+            '[class*="off"]'
+          ]) || null;
           
-          const ratingText = getText('.qzqFw');
+          // Location
+          const location = getText([
+            '.oa6ri',
+            '[class*="location"]',
+            '[class*="region"]'
+          ]) || '';
+          
+          // ⭐ SOLD COUNT - Using correct Lazada selector: ._1cEkb
+          let soldCount = '';
+          
+          // Method 1: Lazada's specific sold count class
+          soldCount = getText([
+            '._1cEkb',           // Lazada's sold count container
+            '._1cEkb span',      // First span inside (contains "10 sold")
+            '.m2RZo',            // Backup selector
+            '[class*="sold"]',   // Any class containing "sold"
+          ]);
+          
+          // Method 2: Search all text for "X sold" pattern if not found
+          if (!soldCount) {
+            const allSpans = item.querySelectorAll('span');
+            for (const span of Array.from(allSpans)) {
+              const text = span.textContent?.trim() || '';
+              // Match patterns like "10 sold", "1.3K sold", "20.0K sold"
+              if (text.match(/^[\d.,]+[kK]?\s+sold$/i)) {
+                soldCount = text;
+                break;
+              }
+            }
+          }
+          
+          // Clean up sold count (remove "sold" text)
+          if (soldCount) {
+            soldCount = soldCount.replace(/\s*sold\s*/gi, '').trim();
+          }
+          
+          // Final fallback
+          if (!soldCount || soldCount === '') {
+            soldCount = '0';
+          }
+          
+          // Rating
+          const ratingText = getText([
+            '.qzqFw',
+            '[class*="rating"]',
+            '.rating-score'
+          ]);
           const rating = ratingText ? parseFloat(ratingText) : null;
           
-          const imageUrl = getAttr('img', 'src');
-          const productUrl = getAttr('a', 'href');
+          // Review count
+          const reviewText = getText([
+            '[class*="review"]'
+          ]);
+          const reviewMatch = reviewText.match(/\d+/);
+          const reviewCount = reviewMatch ? parseInt(reviewMatch[0]) : 0;
+          
+          // Image
+          const imageUrl = getAttr(['img'], 'src') || getAttr(['img'], 'data-src');
+          
+          // Product URL
+          const productUrl = getAttr(['a'], 'href');
           
           // Extract item ID from URL
-          const urlMatch = productUrl.match(/i(\d+)-/);
+          const urlMatch = productUrl.match(/i(\d+)-/) || productUrl.match(/products\/[^\/]*-i(\d+)/);
           const itemId = urlMatch ? urlMatch[1] : '';
+
+          // Shop name (might not be visible in grid view)
+          const shopName = getText([
+            '[class*="shop"]',
+            '[class*="store"]'
+          ]);
 
           return {
             name,
@@ -287,9 +320,9 @@ export class LazadaScraper {
             originalPrice,
             discount,
             rating,
-            reviewCount: 0,
+            reviewCount,
             soldCount,
-            shopName: '',
+            shopName,
             location,
             imageUrl,
             productUrl: productUrl.startsWith('http') ? productUrl : `https:${productUrl}`,
@@ -298,40 +331,23 @@ export class LazadaScraper {
             itemId
           };
         });
-      });
+      }, workingSelector);
 
       await page.close();
+      
+      console.log(`Successfully extracted ${pageProducts.length} products`);
+      
+      // Log sample of sold counts for debugging
+      const soldCountSamples = pageProducts.slice(0, 5).map(p => `"${p.soldCount}"`).join(', ');
+      console.log(`Sample sold counts: ${soldCountSamples}`);
+      
       return pageProducts;
 
     } catch (error) {
       await page.close();
-      throw new Error(`Failed to scrape category: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to scrape shop page: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }
-
-  private async autoScroll(page: Page) {
-    await page.evaluate(async () => {
-      await new Promise<void>((resolve) => {
-        let totalHeight = 0;
-        const distance = 100;
-        const timer = setInterval(() => {
-          const scrollHeight = document.body.scrollHeight;
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-
-          if (totalHeight >= scrollHeight || totalHeight > 5000) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 100);
-      });
-    });
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
-// Export a singleton instance
 export const lazadaScraper = new LazadaScraper();
