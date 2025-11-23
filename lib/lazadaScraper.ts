@@ -62,6 +62,74 @@ export class LazadaScraper {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * Auto-paginate through all pages starting from the given URL
+   */
+  async scrapeShopPageWithAutoPagination(url: string): Promise<ScrapedProduct[]> {
+    const allProducts: ScrapedProduct[] = [];
+    let currentPage = 1;
+    const maxPages = 50; // Safety limit
+    
+    // Parse the URL to check if it has a page parameter
+    const urlObj = new URL(url);
+    const pageParam = urlObj.searchParams.get('page');
+    
+    if (pageParam) {
+      currentPage = parseInt(pageParam);
+      console.log(`✅ URL has page parameter: page=${pageParam}`);
+    } else {
+      console.log(`⚠️  WARNING: URL does not have 'page=' parameter!`);
+      console.log(`   This might not work correctly for pagination.`);
+      console.log(`   TIP: Click on page number '1' on Lazada and copy that URL.`);
+      console.log(`   Attempting to add page parameter...`);
+    }
+    
+    // Ensure critical Lazada parameters are present
+    const requiredParams = ['from', 'langFlag', 'pageTypeId', 'q'];
+    const missingParams = requiredParams.filter(param => !urlObj.searchParams.get(param));
+    
+    if (missingParams.length > 0) {
+      console.log(`⚠️  WARNING: URL is missing parameters: ${missingParams.join(', ')}`);
+      console.log(`   Make sure to copy the FULL URL from Lazada shop page!`);
+    }
+    
+    console.log(`🚀 Starting auto-pagination from page ${currentPage}`);
+    
+    while (currentPage <= maxPages) {
+      // Update the page parameter in URL
+      urlObj.searchParams.set('page', currentPage.toString());
+      const currentUrl = urlObj.toString();
+      
+      console.log(`\n📄 Scraping page ${currentPage}...`);
+      console.log(`URL: ${currentUrl}`);
+      
+      try {
+        const pageProducts = await this.scrapeShopPage(currentUrl);
+        
+        if (pageProducts.length === 0) {
+          console.log(`✋ Page ${currentPage} returned 0 products. Stopping pagination.`);
+          break;
+        }
+        
+        console.log(`✅ Page ${currentPage}: Found ${pageProducts.length} products`);
+        allProducts.push(...pageProducts);
+        
+        currentPage++;
+        
+        // Small delay between pages to be nice to the server
+        await this.delay(2000);
+        
+      } catch (error) {
+        console.log(`❌ Page ${currentPage} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.log(`Stopping pagination at page ${currentPage - 1}`);
+        break;
+      }
+    }
+    
+    console.log(`\n🎉 Auto-pagination complete! Total products: ${allProducts.length} from ${currentPage - 1} pages`);
+    return allProducts;
+  }
+
   async scrapeShopPage(url: string): Promise<ScrapedProduct[]> {
     if (!this.browser) {
       await this.initialize();

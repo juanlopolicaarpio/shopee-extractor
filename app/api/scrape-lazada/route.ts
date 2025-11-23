@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { urls, format } = body;
+    const { urls, format, autoPaginate = true } = body;
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
@@ -30,12 +30,28 @@ export async function POST(request: NextRequest) {
     // Scrape each shop page
     for (const url of urls) {
       try {
-        console.log(`Scraping ${url}...`);
-        const products = await scraper.scrapeShopPage(url);
-        console.log(`Found ${products.length} products from ${url}`);
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🔍 Processing URL: ${url}`);
+        console.log(`${'='.repeat(60)}`);
+        
+        let products;
+        
+        if (autoPaginate) {
+          // Use auto-pagination - scrapes ALL pages automatically
+          console.log('📚 Auto-pagination mode: Will scrape ALL pages automatically');
+          products = await scraper.scrapeShopPageWithAutoPagination(url);
+        } else {
+          // Single page mode - only scrapes the exact URL
+          console.log('📄 Single page mode: Will scrape only this URL');
+          products = await scraper.scrapeShopPage(url);
+        }
+        
+        console.log(`✅ Successfully extracted ${products.length} products from this URL`);
         allProducts = [...allProducts, ...products];
+        
       } catch (error) {
-        console.error(`Failed to scrape ${url}:`, error);
+        console.error(`❌ Failed to scrape ${url}:`, error);
+        // Continue to next URL even if one fails
       }
     }
 
@@ -48,7 +64,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Total products scraped: ${allProducts.length}`);
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🎉 TOTAL PRODUCTS SCRAPED: ${allProducts.length}`);
+    console.log(`${'='.repeat(60)}\n`);
 
     // Generate file based on format
     let fileContent: Buffer | string;

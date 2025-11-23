@@ -138,7 +138,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           urls: validUrls,
-          format: format
+          format: format,
+          autoPaginate: true  // Enable auto-pagination
         })
       });
 
@@ -357,17 +358,19 @@ export default function Home() {
           {/* LAZADA CONTENT */}
           {platform === 'lazada' && (
             <>
-              {/* Info Banner */}
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+              {/* Info Banner with Auto-Pagination */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-4 mb-6">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="h-6 w-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="ml-3">
+                    <h4 className="text-sm font-bold text-blue-800 mb-1">🚀 AUTO-PAGINATION ENABLED!</h4>
                     <p className="text-sm text-blue-700">
-                      <strong>Supported URLs:</strong> Lazada shop pages and brand store pages (e.g., cetaphil, lazmall stores)
+                      Just paste <strong>ONE URL</strong> and the scraper will automatically get ALL pages (1, 2, 3, 4...) for you! 
+                      No need to manually add multiple URLs anymore. 🎉
                     </p>
                   </div>
                 </div>
@@ -394,19 +397,19 @@ export default function Home() {
                       type="text"
                       value={url}
                       onChange={(e) => updateUrlInput(index, e.target.value)}
-                      placeholder="https://www.lazada.com.ph/cetaphil/?q=All-Products&from=wangpu..."
+                      placeholder="https://www.lazada.com.ph/shop/?from=wangpu&langFlag=en&page=1&pageTypeId=2&q=All-Products"
                       className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Add More Button */}
+              {/* Add More Button - Optional for multiple DIFFERENT shops */}
               <button
                 onClick={addUrlInput}
                 className="mb-6 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors font-medium"
               >
-                ➕ Add Another URL
+                ➕ Add Another Shop URL (Optional - for different shops)
               </button>
 
               {/* Action Buttons */}
@@ -416,21 +419,21 @@ export default function Home() {
                   disabled={lazadaLoading}
                   className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
                 >
-                  {lazadaLoading ? '⏳ Scraping...' : '📊 Download Excel'}
+                  {lazadaLoading ? '⏳ Scraping All Pages...' : '📊 Download Excel'}
                 </button>
                 <button
                   onClick={() => handleLazadaScrape('csv')}
                   disabled={lazadaLoading}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
                 >
-                  {lazadaLoading ? '⏳ Scraping...' : '📄 Download CSV'}
+                  {lazadaLoading ? '⏳ Scraping All Pages...' : '📄 Download CSV'}
                 </button>
                 <button
                   onClick={() => handleLazadaScrape('json')}
                   disabled={lazadaLoading}
                   className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
                 >
-                  {lazadaLoading ? '⏳ Scraping...' : '📋 Download JSON'}
+                  {lazadaLoading ? '⏳ Scraping All Pages...' : '📋 Download JSON'}
                 </button>
               </div>
 
@@ -440,8 +443,10 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                     <div>
-                      <div className="font-semibold text-blue-800">Scraping in progress...</div>
-                      <div className="text-sm text-blue-600">Loading all products from the shop. This may take 2-5 minutes.</div>
+                      <div className="font-semibold text-blue-800">🚀 Auto-pagination in progress...</div>
+                      <div className="text-sm text-blue-600">
+                        Automatically scraping ALL pages. This may take 2-10 minutes depending on total products.
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -453,11 +458,11 @@ export default function Home() {
                   <h3 className="font-semibold text-green-800 mb-2">✅ Success!</h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <div className="text-gray-600">URLs Scraped</div>
+                      <div className="text-gray-600">Shop URLs</div>
                       <div className="text-2xl font-bold text-green-700">{lazadaStats.totalUrls}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Products Extracted</div>
+                      <div className="text-gray-600">Total Products (All Pages)</div>
                       <div className="text-2xl font-bold text-green-700">{lazadaStats.totalProducts}</div>
                     </div>
                   </div>
@@ -474,36 +479,57 @@ export default function Home() {
 
               {/* Instructions */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <h3 className="font-semibold text-gray-800 mb-4 text-lg">📖 How to Use Lazada Scraper</h3>
+                <h3 className="font-semibold text-gray-800 mb-4 text-lg">📖 How to Use Lazada Auto-Scraper</h3>
                 
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-2">Step 1: Copy Shop/Brand URL</p>
-                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
-                      <li>Go to a Lazada shop or brand page</li>
-                      <li><strong>Select the "All Products" section</strong> on the shop page</li>
-                      <li>Copy the full URL from your browser address bar</li>
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 p-4">
+                    <p className="text-sm font-bold text-green-800 mb-2">✨ NEW: Auto-Pagination Feature!</p>
+                    <ul className="list-disc list-inside text-sm text-green-700 space-y-1 ml-2">
+                      <li><strong>Just paste ONE URL</strong> - no need to copy multiple page URLs anymore!</li>
+                      <li>The scraper automatically detects and scrapes ALL pages (1, 2, 3, 4...)</li>
+                      <li>Stops automatically when no more products are found</li>
+                      <li>Super easy - paste once, get everything!</li>
                     </ul>
                   </div>
 
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-2">Step 2: Paste URL Above</p>
-                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
-                      <li>Paste the URL in the input field</li>
-                      <li>The scraper will automatically load ALL products from that page</li>
-                    </ul>
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                    <p className="text-sm font-bold text-red-800 mb-2">⚠️ IMPORTANT: Use the CORRECT URL Format!</p>
+                    <p className="text-sm text-red-700 mb-2">
+                      Your URL must include the <strong className="font-mono">page=</strong> parameter for pagination to work!
+                    </p>
+                    <div className="text-sm text-red-700 space-y-2">
+                      <div>
+                        <div className="font-semibold">❌ WRONG (won't paginate correctly):</div>
+                        <code className="bg-red-100 px-2 py-1 rounded text-xs block mt-1">
+                          .../cetaphil/?q=All-Products&from=wangpu
+                        </code>
+                      </div>
+                      <div>
+                        <div className="font-semibold">✅ CORRECT (works perfectly):</div>
+                        <code className="bg-green-100 px-2 py-1 rounded text-xs block mt-1">
+                          .../cetaphil/?from=wangpu&page=1&q=All-Products&langFlag=en&pageTypeId=2
+                        </code>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="bg-blue-50 border-l-4 border-blue-500 p-3">
-                    <p className="text-sm font-semibold text-blue-800 mb-2">📄 For Multiple Pages (Page 2, 3, etc.):</p>
-                    <ul className="list-disc list-inside text-sm text-blue-700 space-y-1 ml-2">
-                      <li>Lazada has page number buttons (1, 2, 3, etc.) at the bottom</li>
-                      <li>Click page number 2, 3, etc. on Lazada</li>
-                      <li>Copy the new URL from your browser</li>
-                      <li>Click "➕ Add Another URL" button above</li>
-                      <li>Paste the new page URL</li>
-                      <li>Repeat for all pages you want to extract</li>
-                      <li>The scraper will load ALL products from each page URL</li>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Step 1: Get the CORRECT URL</p>
+                    <ol className="list-decimal list-inside text-sm text-gray-600 space-y-2 ml-2">
+                      <li>Go to any Lazada shop or brand page</li>
+                      <li><strong>Click on "All Products"</strong> section</li>
+                      <li className="font-semibold text-blue-700">Look at the bottom of the page for pagination buttons (1, 2, 3, &gt;)</li>
+                      <li className="font-semibold text-blue-700">Click on the number "1" button (even if you're already on page 1)</li>
+                      <li>Now copy the URL from your browser address bar</li>
+                      <li className="text-xs text-gray-500 ml-6">The URL should now include <code className="bg-gray-200 px-1 rounded">page=1</code></li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Step 2: Paste URL</p>
+                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
+                      <li>Paste the FULL URL (with all parameters) in the input field above</li>
+                      <li>That's it! The scraper will handle ALL pages automatically</li>
                     </ul>
                   </div>
 
@@ -511,21 +537,21 @@ export default function Home() {
                     <p className="text-sm font-semibold text-gray-700 mb-2">Step 3: Download</p>
                     <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-2">
                       <li>Click your preferred format (Excel, CSV, or JSON)</li>
-                      <li>Wait for scraping to complete (usually 2-5 minutes per URL)</li>
-                      <li>File will download automatically with all product data</li>
+                      <li>Wait for auto-pagination to complete</li>
+                      <li>File downloads automatically with ALL products from ALL pages!</li>
                     </ul>
                   </div>
 
                   <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mt-4">
                     <p className="text-sm text-yellow-800">
-                      <strong>⚠️ Important Notes:</strong>
+                      <strong>💡 Pro Tips:</strong>
                     </p>
                     <ul className="list-disc list-inside text-sm text-yellow-700 mt-2 space-y-1 ml-2">
-                      <li>Scraping takes time - be patient and don't refresh the page</li>
-                      <li>Each URL can take 2-5 minutes to scrape completely</li>
-                      <li>Multiple URLs = longer wait time (but worth it!)</li>
-                      <li>The scraper loads ALL products from each URL automatically</li>
-                      <li>Includes: name, price, discount, rating, sold count, shop info, etc.</li>
+                      <li><strong>Always click page "1" button</strong> before copying URL to ensure it has the page parameter</li>
+                      <li>Auto-pagination takes 2-10 minutes depending on total products</li>
+                      <li>Don't refresh the page while scraping</li>
+                      <li>The scraper automatically stops when no more pages are found</li>
+                      <li>Check browser console for detailed scraping progress</li>
                     </ul>
                   </div>
                 </div>
